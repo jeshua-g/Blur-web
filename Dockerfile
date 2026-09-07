@@ -54,7 +54,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DATA_DIR=/data \
     PATH="/opt/blur:/opt/ffmpeg/bin:/usr/local/bin:${PATH}" \
     LD_LIBRARY_PATH=/opt/ffmpeg/lib:/usr/local/lib \
-    VS_PLUGIN_PATH=/opt/blur/vapoursynth-plugins \
     PYTHONPATH=/usr/local/lib/python3/dist-packages:/usr/local/lib/python3.12/dist-packages:/usr/local/lib/python3.12/site-packages
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -65,10 +64,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=build /usr/local /usr/local
 COPY --from=build /opt/blur /opt/blur
 COPY --from=ffmpeg /opt/ffmpeg /opt/ffmpeg
-RUN echo /usr/local/lib > /etc/ld.so.conf.d/vapoursynth.conf \
+# R73 autoloads $libdir/vapoursynth only; VS_PLUGIN_PATH is ignored. BestSource is not LoadPlugin'd by blur.
+RUN mkdir -p /usr/local/lib/vapoursynth \
+    && ln -sf /opt/blur/vapoursynth-plugins/*.so /usr/local/lib/vapoursynth/ \
+    && echo /usr/local/lib > /etc/ld.so.conf.d/vapoursynth.conf \
     && echo /opt/ffmpeg/lib > /etc/ld.so.conf.d/ffmpeg.conf \
     && ldconfig \
-    && python3 -c "import vapoursynth as vs; c=vs.core; assert hasattr(c,'bs'), [p.namespace for p in c.plugins()]" \
+    && python3 -c "\
+from pathlib import Path\n\
+import vapoursynth as vs\n\
+c=vs.core\n\
+fails=[]\n\
+for p in sorted(Path('/opt/blur/vapoursynth-plugins').glob('*.so')):\n\
+    try: c.std.LoadPlugin(path=str(p))\n\
+    except Exception as e: fails.append('%s: %s'%(p.name,e))\n\
+print([x.namespace for x in c.plugins()] or fails)\n\
+assert hasattr(c,'bs'), fails\n\
+" \
     && vspipe --version \
     && ffmpeg -version \
     && test -x /opt/blur/blur-cli
