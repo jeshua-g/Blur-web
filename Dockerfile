@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -22,7 +22,7 @@ RUN mkdir -p /tmp/extract /opt/blur \
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip3 install --break-system-packages --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY static ./static
 
