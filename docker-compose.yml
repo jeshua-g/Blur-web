@@ -1,0 +1,20 @@
+services:
+  blur:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000"
+    volumes:
+      - blur-data:/data
+    environment:
+      BLUR_WEB_PASSWORD: ${BLUR_WEB_PASSWORD:-}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-2048}
+    networks:
+      - dokploy-network
+
+volumes:
+  blur-data:
+
+networks:
+  dokploy-network:
+    external: true

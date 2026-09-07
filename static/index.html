@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>blur</title>
+  <style>
+    :root {
+      --bg: #000;
+      --fg: #fff;
+      --muted: #8a8a8a;
+      --line: #2a2a2a;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+    }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      min-height: 100dvh;
+    }
+    button, input, select {
+      font: inherit;
+      color: inherit;
+      background: transparent;
+    }
+    button { cursor: pointer; }
+    .pill {
+      min-width: 132px;
+      border: 1px solid var(--fg);
+      border-radius: 999px;
+      padding: 8px 22px;
+      transition: transform 100ms var(--ease-out), opacity 160ms ease;
+    }
+    .pill:active { transform: scale(0.97); }
+    .pill:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+    #home {
+      min-height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      place-items: center;
+      padding: 36px 20px 28px;
+    }
+    .logo {
+      font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: 0.01em;
+      margin: 0;
+    }
+    .center { text-align: center; }
+    .hint {
+      margin: 14px 0 0;
+      font-size: 13px;
+      color: var(--fg);
+    }
+    .meta, .status {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .status.err { color: var(--fg); }
+    .bar {
+      width: min(220px, 70vw);
+      height: 1px;
+      margin: 18px auto 0;
+      background: var(--line);
+      overflow: hidden;
+      display: none;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--fg);
+      transition: width 120ms ease-out;
+    }
+    a.dl {
+      display: none;
+      margin-top: 18px;
+      color: var(--fg);
+      font-size: 13px;
+    }
+
+    #config {
+      display: none;
+      min-height: 100dvh;
+      padding: 28px 20px 40px;
+    }
+    .sheet {
+      width: min(420px, 100%);
+      margin: 0 auto;
+    }
+    .sec { margin: 0 0 28px; }
+    .sec h2 {
+      margin: 0 0 14px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin: 0 0 12px;
+      font-size: 13px;
+    }
+    .row.stack {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .row label { color: var(--fg); }
+    .val { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #fff;
+    }
+    select, input[type="text"], input[type="number"] {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 8px;
+      min-width: 140px;
+    }
+    input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      border: 1px solid var(--fg);
+      border-radius: 2px;
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    input[type="checkbox"]:checked {
+      background: var(--fg);
+    }
+    input[type="checkbox"]:checked::after {
+      content: "";
+      width: 7px;
+      height: 4px;
+      margin-top: -1px;
+      border-left: 1.5px solid var(--bg);
+      border-bottom: 1.5px solid var(--bg);
+      transform: rotate(-45deg);
+    }
+    input[type="checkbox"]:focus-visible,
+    .pick-btn:focus-visible {
+      outline: 1px solid var(--fg);
+      outline-offset: 2px;
+    }
+    select.native {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .pick { position: relative; }
+    .pick-btn {
+      min-width: 140px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 28px 5px 8px;
+      text-align: left;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path fill='white' d='M0 0l5 6 5-6z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+    .pick-list {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      min-width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--fg);
+      border-radius: 6px;
+      z-index: 20;
+      max-height: 220px;
+      overflow: auto;
+      opacity: 0;
+      transform: translateY(4px);
+      pointer-events: none;
+      transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+    }
+    .pick.open .pick-list {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .pick-item {
+      padding: 7px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .pick-item:hover,
+    .pick-item.on {
+      background: var(--fg);
+      color: var(--bg);
+    }
+    #toasts {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 50;
+      width: min(360px, calc(100% - 32px));
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      border: 1px solid var(--fg);
+      background: var(--bg);
+      color: var(--fg);
+      padding: 10px 14px;
+      font-size: 13px;
+      line-height: 1.35;
+      border-radius: 12px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+    }
+    .toast.in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pick-list, .toast { transform: none !important; }
+    }
+    .foot {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    body.show-config #home { display: none; }
+    body.show-config #config { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <input id="file" type="file" accept="video/*,.mp4,.mkv,.mov,.avi,.webm,.m4v" hidden />
+
+  <section id="home">
+    <h1 class="logo">blur</h1>
+    <div class="center">
+      <button type="button" class="pill" id="open">Open files</button>
+      <p class="hint">or drop them anywhere</p>
+      <div class="bar" id="bar"><i></i></div>
+      <div class="meta" id="picked"></div>
+      <div class="status" id="status"></div>
+      <a class="dl" id="dl" href="#">Download</a>
+    </div>
+    <button type="button" class="pill" id="to-config">Config</button>
+  </section>
+
+  <section id="config">
+    <form class="sheet" id="form">
+      <div class="sec">
+        <h2>blur</h2>
+        <div class="row"><label for="blur">blur</label><input id="blur" name="blur" type="checkbox" checked /></div>
+        <div class="row stack">
+          <div class="row"><label for="blur_amount">blur amount</label><span class="val" data-for="blur_amount">1</span></div>
+          <input id="blur_amount" name="blur_amount" type="range" min="0" max="4" step="0.01" value="1" />
+        </div>
+        <div class="row stack">
+          <div class="row"><label for="blur_output_fps">output fps</label><span class="val" data-for="blur_output_fps">60</span></div>
+          <input id="blur_output_fps" name="blur_output_fps" type="range" min="1" max="120" step="1" value="60" />
+        </div>
+        <div class="row">
+          <label for="blur_weighting">blur weighting</label>
+          <select id="blur_weighting" name="blur_weighting">
+            <option>equal</option>
+            <option>gaussian_sym</option>
+            <option>vegas</option>
+            <option>pyramid</option>
+            <option>gaussian</option>
+            <option>ascending</option>
+            <option>descending</option>
+            <option>gaussian_reverse</option>
+          </select>
+        </div>
+        <div class="row stack">
+          <div class="row"><label for="blur_gamma">blur gamma</label><span class="val" data-for="blur_gamma">1</span></div>
+          <input id="blur_gamma" name="blur_gamma" type="range" min="0.1" max="4" step="0.01" value="1" />
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>interpolation</h2>
+        <div class="row"><label for="interpolate">interpolate</label><input id="interpolate" name="interpolate" type="checkbox" /></div>
+        <div class="row">
+          <label for="interpolated_fps">interpolated fps</label>
+          <input id="interpolated_fps" name="interpolated_fps" type="text" value="5x" />
+        </div>
+        <div class="row">
+          <label for="interpolation_method">interpolation method</label>
+          <select id="interpolation_method" name="interpolation_method">
+            <option value="svp">svp</option>
+            <option value="rife">rife</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>pre-interpolation</h2>
+        <div class="row"><label for="pre_interpolate">pre-interpolate</label><input id="pre_interpolate" name="pre_interpolate" type="checkbox" /></div>
+        <div class="row">
+          <label for="pre_interpolated_fps">pre-interpolated fps</label>
+          <input id="pre_interpolated_fps" name="pre_interpolated_fps" type="text" value="360" />
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>deduplicate</h2>
+        <div class="row"><label for="deduplicate">deduplicate</label><input id="deduplicate" name="deduplicate" type="checkbox" checked /></div>
+        <div class="row">
+          <label for="deduplicate_method">deduplicate method</label>
+          <select id="deduplicate_method" name="deduplicate_method">
+            <option value="svp">svp</option>
+            <option value="rife">rife</option>
+            <option value="old">old</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>rendering</h2>
+        <div class="row">
+          <label for="encode_preset">encode preset</label>
+          <select id="encode_preset" name="encode_preset">
+            <option value="h264">h264</option>
+            <option value="h265">h265</option>
+            <option value="av1">av1</option>
+            <option value="vp9">vp9</option>
+          </select>
+        </div>
+        <div class="row stack">
+          <div class="row"><label for="quality">quality</label><span class="val" data-for="quality">18</span></div>
+          <input id="quality" name="quality" type="range" min="0" max="51" step="1" value="18" />
+        </div>
+        <p class="meta" style="margin:0 0 12px">0 lossless · 23 balanced · 51 worst</p>
+        <div class="row"><label for="detailed_filenames">detailed filenames</label><input id="detailed_filenames" name="detailed_filenames" type="checkbox" /></div>
+      </div>
+
+      <div class="sec">
+        <h2>gpu acceleration</h2>
+        <div class="row"><label for="gpu_decoding">gpu decoding</label><input id="gpu_decoding" name="gpu_decoding" type="checkbox" /></div>
+        <div class="row"><label for="gpu_interpolation">gpu interpolation</label><input id="gpu_interpolation" name="gpu_interpolation" type="checkbox" /></div>
+        <div class="row"><label for="gpu_encoding">gpu encoding</label><input id="gpu_encoding" name="gpu_encoding" type="checkbox" /></div>
+      </div>
+
+      <div class="sec">
+        <h2>timescale</h2>
+        <div class="row"><label for="timescale">timescale</label><input id="timescale" name="timescale" type="checkbox" /></div>
+        <div class="row stack">
+          <div class="row"><label for="input_timescale">input timescale</label><span class="val" data-for="input_timescale">1</span></div>
+          <input id="input_timescale" name="input_timescale" type="range" min="0.1" max="4" step="0.05" value="1" />
+        </div>
+        <div class="row stack">
+          <div class="row"><label for="output_timescale">output timescale</label><span class="val" data-for="output_timescale">1</span></div>
+          <input id="output_timescale" name="output_timescale" type="range" min="0.1" max="4" step="0.05" value="1" />
+        </div>
+        <div class="row"><label for="output_timescale_audio_pitch">adjust timescaled audio pitch</label><input id="output_timescale_audio_pitch" name="output_timescale_audio_pitch" type="checkbox" /></div>
+      </div>
+
+      <div class="sec">
+        <h2>filters</h2>
+        <div class="row"><label for="filters">filters</label><input id="filters" name="filters" type="checkbox" /></div>
+        <div class="row stack">
+          <div class="row"><label for="brightness">brightness</label><span class="val" data-for="brightness">1</span></div>
+          <input id="brightness" name="brightness" type="range" min="0" max="4" step="0.01" value="1" />
+        </div>
+        <div class="row stack">
+          <div class="row"><label for="saturation">saturation</label><span class="val" data-for="saturation">1</span></div>
+          <input id="saturation" name="saturation" type="range" min="0" max="4" step="0.01" value="1" />
+        </div>
+        <div class="row stack">
+          <div class="row"><label for="contrast">contrast</label><span class="val" data-for="contrast">1</span></div>
+          <input id="contrast" name="contrast" type="range" min="0" max="4" step="0.01" value="1" />
+        </div>
+      </div>
+
+      <div class="foot">
+        <button type="button" class="pill" id="back">Back</button>
+        <button type="button" class="pill" id="reset">Restore defaults</button>
+      </div>
+    </form>
+  </section>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <script>
+    const KEY = "blur-web-config";
+    const EXTS = [".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"];
+    const fileInput = document.getElementById("file");
+    const form = document.getElementById("form");
+    const picked = document.getElementById("picked");
+    const status = document.getElementById("status");
+    const bar = document.getElementById("bar");
+    const barFill = bar.querySelector("i");
+    const dl = document.getElementById("dl");
+    const toasts = document.getElementById("toasts");
+    let busy = false;
+    let openPick = null;
+
+    const defaults = () => ({
+      blur: true,
+      blur_amount: 1,
+      blur_output_fps: 60,
+      blur_weighting: "equal",
+      blur_gamma: 1,
+      interpolate: false,
+      interpolated_fps: "5x",
+      interpolation_method: "svp",
+      pre_interpolate: false,
+      pre_interpolated_fps: "360",
+      deduplicate: true,
+      deduplicate_method: "svp",
+      encode_preset: "h264",
+      quality: 18,
+      detailed_filenames: false,
+      gpu_decoding: false,
+      gpu_interpolation: false,
+      gpu_encoding: false,
+      timescale: false,
+      input_timescale: 1,
+      output_timescale: 1,
+      output_timescale_audio_pitch: false,
+      filters: false,
+      brightness: 1,
+      saturation: 1,
+      contrast: 1,
+    });
+
+    function toast(message) {
+      const el = document.createElement("div");
+      el.className = "toast";
+      el.textContent = message;
+      toasts.append(el);
+      requestAnimationFrame(() => el.classList.add("in"));
+      const close = () => {
+        el.classList.remove("in");
+        setTimeout(() => el.remove(), 200);
+      };
+      el.addEventListener("click", close);
+      setTimeout(close, 5200);
+    }
+
+    function apiError(payload, fallback) {
+      if (!payload) return fallback;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch { return payload || fallback; }
+      }
+      const d = payload.detail;
+      if (d && typeof d === "object" && d.message) return d.message;
+      if (typeof d === "string") return d;
+      return payload.message || fallback;
+    }
+
+    function readForm() {
+      const data = {};
+      for (const el of form.elements) {
+        if (!el.name) continue;
+        data[el.name] = el.type === "checkbox" ? el.checked : (el.type === "range" ? Number(el.value) : el.value);
+      }
+      return data;
+    }
+
+    function writeForm(data) {
+      for (const [k, v] of Object.entries(data)) {
+        const el = form.elements[k];
+        if (!el) continue;
+        if (el.type === "checkbox") el.checked = !!v;
+        else el.value = v;
+      }
+      syncVals();
+      document.querySelectorAll("select.native").forEach(syncPick);
+    }
+
+    function syncVals() {
+      document.querySelectorAll(".val[data-for]").forEach((n) => {
+        const el = document.getElementById(n.dataset.for);
+        if (el) n.textContent = el.value;
+      });
+    }
+
+    function closePick() {
+      if (!openPick) return;
+      openPick.classList.remove("open");
+      openPick.querySelector(".pick-btn").setAttribute("aria-expanded", "false");
+      openPick = null;
+    }
+
+    function syncPick(sel) {
+      const wrap = sel.closest(".pick");
+      if (!wrap) return;
+      wrap.querySelector(".pick-btn").textContent = sel.options[sel.selectedIndex]?.text || sel.value;
+      wrap.querySelectorAll(".pick-item").forEach((item) => {
+        item.classList.toggle("on", item.dataset.value === sel.value);
+      });
+    }
+
+    function enhanceSelects() {
+      form.querySelectorAll("select").forEach((sel) => {
+        if (sel.closest(".pick")) return;
+        const wrap = document.createElement("div");
+        wrap.className = "pick";
+        sel.classList.add("native");
+        sel.parentNode.insertBefore(wrap, sel);
+        wrap.append(sel);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pick-btn";
+        btn.setAttribute("aria-haspopup", "listbox");
+        btn.setAttribute("aria-expanded", "false");
+        const label = form.querySelector(`label[for="${sel.id}"]`);
+        btn.setAttribute("aria-label", label?.textContent || sel.name);
+        const list = document.createElement("div");
+        list.className = "pick-list";
+        list.setAttribute("role", "listbox");
+        [...sel.options].forEach((opt) => {
+          const item = document.createElement("div");
+          item.className = "pick-item";
+          item.setAttribute("role", "option");
+          item.dataset.value = opt.value;
+          item.textContent = opt.text;
+          item.addEventListener("click", () => {
+            sel.value = opt.value;
+            sel.dispatchEvent(new Event("input", { bubbles: true }));
+            syncPick(sel);
+            closePick();
+          });
+          list.append(item);
+        });
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const open = wrap.classList.contains("open");
+          closePick();
+          if (!open) {
+            wrap.classList.add("open");
+            btn.setAttribute("aria-expanded", "true");
+            openPick = wrap;
+          }
+        });
+        wrap.append(btn, list);
+        syncPick(sel);
+      });
+    }
+
+    function save() {
+      localStorage.setItem(KEY, JSON.stringify(readForm()));
+    }
+
+    function load() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(KEY) || "null");
+        writeForm({ ...defaults(), ...(raw || {}) });
+      } catch {
+        writeForm(defaults());
+      }
+    }
+
+    function extOf(name) {
+      const i = name.lastIndexOf(".");
+      return i >= 0 ? name.slice(i).toLowerCase() : "";
+    }
+
+    form.addEventListener("input", () => { syncVals(); save(); });
+    document.addEventListener("click", closePick);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePick(); });
+    document.getElementById("to-config").addEventListener("click", () => {
+      document.body.classList.add("show-config");
+    });
+    document.getElementById("back").addEventListener("click", () => {
+      save();
+      document.body.classList.remove("show-config");
+    });
+    document.getElementById("reset").addEventListener("click", () => {
+      writeForm(defaults());
+      save();
+    });
+
+    document.getElementById("open").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) send(fileInput.files[0]);
+      fileInput.value = "";
+    });
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (!f) {
+        toast("that drop didn’t include a file");
+        return;
+      }
+      send(f);
+    });
+
+    function poll(id) {
+      const tick = async () => {
+        let r;
+        try {
+          r = await fetch("/api/jobs/" + id);
+        } catch {
+          toast("lost connection to the vps while rendering");
+          busy = false;
+          return;
+        }
+        if (r.status === 404) {
+          toast("that job disappeared on the server");
+          busy = false;
+          return;
+        }
+        const j = await r.json();
+        if (j.status === "queued") status.textContent = "waiting";
+        if (j.status === "running") status.textContent = "rendering";
+        if (j.status === "done") {
+          status.textContent = "done";
+          dl.href = "/api/jobs/" + id + "/download";
+          dl.style.display = "inline-block";
+          busy = false;
+          return;
+        }
+        if (j.status === "error") {
+          toast(j.error || "render failed");
+          status.textContent = "";
+          busy = false;
+          return;
+        }
+        setTimeout(tick, 2000);
+      };
+      tick();
+    }
+
+    function send(file) {
+      if (busy) {
+        toast("already rendering a clip — wait for it to finish");
+        return;
+      }
+      const ext = extOf(file.name);
+      if (ext && !EXTS.includes(ext) && !(file.type || "").startsWith("video/")) {
+        toast(`${ext} isn’t a supported video`);
+        return;
+      }
+      if (!ext && !(file.type || "").startsWith("video/")) {
+        toast("that file isn’t a video");
+        return;
+      }
+      if (file.size === 0) {
+        toast("that file is empty");
+        return;
+      }
+      if (file.size > 2048 * 1024 * 1024) {
+        toast("that video is larger than 2048 MB");
+        return;
+      }
+      busy = true;
+      document.body.classList.remove("show-config");
+      picked.textContent = file.name;
+      status.className = "status";
+      status.textContent = "uploading";
+      dl.style.display = "none";
+      bar.style.display = "block";
+      barFill.style.width = "0%";
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("config", JSON.stringify(readForm()));
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/jobs");
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        barFill.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+      };
+      xhr.onload = () => {
+        if (xhr.status === 401) {
+          toast("password required");
+          busy = false;
+          return;
+        }
+        if (xhr.status >= 400) {
+          toast(apiError(xhr.responseText, "upload failed"));
+          status.textContent = "";
+          busy = false;
+          return;
+        }
+        status.textContent = "queued";
+        poll(JSON.parse(xhr.responseText).id);
+      };
+      xhr.onerror = () => {
+        toast("could not reach the vps");
+        status.textContent = "";
+        busy = false;
+      };
+      xhr.onabort = () => {
+        toast("upload was cancelled");
+        status.textContent = "";
+        busy = false;
+      };
+      xhr.send(fd);
+    }
+
+    enhanceSelects();
+    load();
+  </script>
+</body>
+</html>
