@@ -70,17 +70,7 @@ RUN mkdir -p /usr/local/lib/vapoursynth \
     && echo /usr/local/lib > /etc/ld.so.conf.d/vapoursynth.conf \
     && echo /opt/ffmpeg/lib > /etc/ld.so.conf.d/ffmpeg.conf \
     && ldconfig \
-    && python3 -c "\
-from pathlib import Path\n\
-import vapoursynth as vs\n\
-c=vs.core\n\
-fails=[]\n\
-for p in sorted(Path('/opt/blur/vapoursynth-plugins').glob('*.so')):\n\
-    try: c.std.LoadPlugin(path=str(p))\n\
-    except Exception as e: fails.append('%s: %s'%(p.name,e))\n\
-print([x.namespace for x in c.plugins()] or fails)\n\
-assert hasattr(c,'bs'), fails\n\
-" \
+    && python3 -c "import vapoursynth as vs; c=vs.core; print([p.namespace for p in c.plugins()]); assert hasattr(c,'bs')" \
     && vspipe --version \
     && ffmpeg -version \
     && test -x /opt/blur/blur-cli
