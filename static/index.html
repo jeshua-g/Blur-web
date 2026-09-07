@@ -651,7 +651,17 @@
           return;
         }
         if (j.status === "error") {
-          toast(j.error || "render failed");
+          const lines = (j.log || "").split("\n").map((l) => l.trim()).filter(Boolean);
+          let hint = "";
+          for (let i = lines.length - 1; i >= 0; i--) {
+            const low = lines[i].toLowerCase();
+            if (low.includes("failed to render")) continue;
+            if (/error|fail|exception|not found|no attribute|cannot|unable/i.test(lines[i])) {
+              hint = lines[i].slice(0, 180);
+              break;
+            }
+          }
+          toast(hint || j.error || "render failed");
           status.textContent = "";
           busy = false;
           return;

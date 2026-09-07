@@ -178,6 +178,19 @@ def fail(status: int, code: str, message: str) -> None:
     raise HTTPException(status, {"code": code, "message": message})
 
 
+def hint_from_log(text: str) -> str:
+    for ln in reversed((text or "").splitlines()):
+        ln = ln.strip()
+        if not ln:
+            continue
+        low = ln.lower()
+        if "failed to render" in low:
+            continue
+        if any(k in low for k in ("error", "fail", "exception", "not found", "no attribute", "cannot", "unable")):
+            return ln[:180]
+    return ""
+
+
 def classify_render(text: str, returncode: int | None = None) -> tuple[str, str]:
     t = (text or "").lower()
     if "not a valid video" in t or "unreadable" in t:
@@ -189,7 +202,7 @@ def classify_render(text: str, returncode: int | None = None) -> tuple[str, str]
     if "no attribute with the name bs" in t or "libavutil.so.60" in t:
         return "blur_init_failed", "blur couldn’t load its video plugins"
     if "failed to render" in t:
-        return "render_failed", "blur failed to render that video"
+        return "render_failed", hint_from_log(text) or "blur failed to render that video"
     if "rife" in t and ("error" in t or "fail" in t):
         return "rife_failed", "rife interpolation failed — switch to svp or turn interpolate off"
     if "svp" in t and ("error" in t or "fail" in t):
@@ -220,10 +233,11 @@ def run_job(job_id: str) -> None:
     log = d / "log.txt"
     write_status(job_id, status="running", log="")
     cmd = [BLUR_BIN, "-i", str(src), "-o", str(dst), "-c", str(d / "blur.cfg"), "-v"]
+    blur_lib = Path(BLUR_BIN).resolve().parent / "lib"
     try:
         proc = subprocess.run(
             cmd,
-            cwd=d,
+            cwd=str(blur_lib if blur_lib.is_dir() else d),
             capture_output=True,
             text=True,
             timeout=6 * 60 * 60,

@@ -33,6 +33,8 @@ def test_classify_render():
     assert code == "blur_init_failed"
     code, msg = classify_render("Failed to render", 0)
     assert code == "render_failed"
+    code, msg = classify_render("Error opening input file -\nFailed to render", 0)
+    assert "opening input" in msg.lower()
 
 
 if __name__ == "__main__":
