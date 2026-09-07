@@ -1,33 +1,63 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04 AS build
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONPATH=/usr/local/lib/python3/dist-packages:/usr/local/lib/python3.12/dist-packages:/usr/local/lib/python3.12/site-packages \
+    PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
+    LD_LIBRARY_PATH=/usr/local/lib
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-pip python3-dev python3-setuptools \
+        build-essential pkg-config meson ninja-build \
+        libzimg-dev wget ca-certificates tar \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --break-system-packages --no-cache-dir 'cython>=3.1'
+
+WORKDIR /tmp/vs
+RUN wget -qO vs.tgz https://github.com/vapoursynth/vapoursynth/archive/refs/tags/R73.tar.gz \
+    && tar xzf vs.tgz --strip-components=1 \
+    && meson setup build --prefix=/usr/local -Dbuildtype=release -Dpython.bytecompile=-1 \
+    && meson compile -C build \
+    && meson install -C build \
+    && ldconfig \
+    && pip3 install --break-system-packages --no-cache-dir . \
+    && python3 -c "import vapoursynth; print(vapoursynth.__version__)" \
+    && vspipe --version
+
+WORKDIR /opt/blur
+RUN wget -qO /tmp/blur.tar.gz https://github.com/f0e/blur/releases/download/v2.45/blur-Linux-Release-x64.tar.gz \
+    && tar -xzf /tmp/blur.tar.gz \
+    && CLI="$(find /opt/blur -maxdepth 1 -type f -name 'blur-cli*' | head -1)" \
+    && ln -sf "$(basename "$CLI")" /opt/blur/blur-cli \
+    && chmod +x "$CLI" /opt/blur/blur-cli \
+    && rm /tmp/blur.tar.gz
+
+
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     BLUR_BIN=/opt/blur/blur-cli \
     DATA_DIR=/data \
-    PATH="/opt/blur:${PATH}"
+    PATH="/opt/blur:/usr/local/bin:${PATH}" \
+    LD_LIBRARY_PATH=/usr/local/lib \
+    PYTHONPATH=/usr/local/lib/python3/dist-packages:/usr/local/lib/python3.12/dist-packages:/usr/local/lib/python3.12/site-packages
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 python3-pip python3-dev python3-setuptools \
-        build-essential pkg-config \
-        ffmpeg libvulkan1 libzimg-dev \
-        wget ca-certificates tar \
+        python3 python3-pip libpython3.12t64 \
+        ffmpeg libvulkan1 libzimg2 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Ubuntu has no vapoursynth package; wheels compile against libzimg
-RUN pip3 install --no-cache-dir cython vapoursynth
-
-RUN mkdir -p /tmp/extract /opt/blur \
-    && wget -qO /tmp/blur.tar.gz https://github.com/f0e/blur/releases/download/v2.45/blur-Linux-Release-x64.tar.gz \
-    && tar -xzf /tmp/blur.tar.gz -C /tmp/extract \
-    && cp -a /tmp/extract/. /opt/blur/ \
-    && CLI="$(find /opt/blur -maxdepth 1 -type f -name 'blur-cli*' | head -1)" \
-    && ln -sf "$(basename "$CLI")" /opt/blur/blur-cli \
-    && chmod +x "$CLI" /opt/blur/blur-cli \
-    && rm -rf /tmp/extract /tmp/blur.tar.gz
+COPY --from=build /usr/local /usr/local
+COPY --from=build /opt/blur /opt/blur
+RUN echo /usr/local/lib > /etc/ld.so.conf.d/vapoursynth.conf \
+    && ldconfig \
+    && python3 -c "import vapoursynth" \
+    && vspipe --version \
+    && test -x /opt/blur/blur-cli
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --break-system-packages --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY static ./static
 
