@@ -186,6 +186,10 @@ def classify_render(text: str, returncode: int | None = None) -> tuple[str, str]
         return "input_missing", "the uploaded file went missing on the server"
     if "failed to initialise" in t:
         return "blur_init_failed", "blur couldn’t start — vapoursynth or plugins are missing"
+    if "no attribute with the name bs" in t or "libavutil.so.60" in t:
+        return "blur_init_failed", "blur couldn’t load its video plugins"
+    if "failed to render" in t:
+        return "render_failed", "blur failed to render that video"
     if "rife" in t and ("error" in t or "fail" in t):
         return "rife_failed", "rife interpolation failed — switch to svp or turn interpolate off"
     if "svp" in t and ("error" in t or "fail" in t):
@@ -226,7 +230,7 @@ def run_job(job_id: str) -> None:
         )
         text = (proc.stdout or "") + (proc.stderr or "")
         log.write_text(text)
-        if proc.returncode != 0 or not dst.is_file():
+        if proc.returncode != 0 or not dst.is_file() or "failed to render" in text.lower():
             code, message = classify_render(text, proc.returncode)
             write_status(job_id, status="error", code=code, error=message, log=text[-4000:])
             return

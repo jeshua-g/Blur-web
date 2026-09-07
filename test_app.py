@@ -29,6 +29,10 @@ def test_classify_render():
     code, msg = classify_render("something else", 7)
     assert code == "render_failed"
     assert "7" in msg
+    code, msg = classify_render("Failed to render\nNo attribute with the name bs exists", 0)
+    assert code == "blur_init_failed"
+    code, msg = classify_render("Failed to render", 0)
+    assert code == "render_failed"
 
 
 if __name__ == "__main__":

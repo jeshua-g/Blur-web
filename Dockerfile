@@ -1,3 +1,17 @@
+FROM ubuntu:24.04 AS ffmpeg
+
+ENV DEBIAN_FRONTEND=noninteractive
+# BestSource in the blur tarball links libavutil.so.60 (FFmpeg 8). Ubuntu 24.04 only has 6.1.
+RUN apt-get update && apt-get install -y --no-install-recommends curl xz-utils ca-certificates \
+    && curl -4fL --retry 5 --retry-all-errors --connect-timeout 20 -o /tmp/ff.tar.xz \
+        https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-shared-8.1.tar.xz \
+    && mkdir -p /opt/ffmpeg \
+    && tar -xJf /tmp/ff.tar.xz -C /opt/ffmpeg --strip-components=1 \
+    && rm /tmp/ff.tar.xz \
+    && test -x /opt/ffmpeg/bin/ffmpeg \
+    && test -f /opt/ffmpeg/lib/libavutil.so.60
+
+
 FROM ubuntu:24.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -38,21 +52,25 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     BLUR_BIN=/opt/blur/blur-cli \
     DATA_DIR=/data \
-    PATH="/opt/blur:/usr/local/bin:${PATH}" \
-    LD_LIBRARY_PATH=/usr/local/lib \
+    PATH="/opt/blur:/opt/ffmpeg/bin:/usr/local/bin:${PATH}" \
+    LD_LIBRARY_PATH=/opt/ffmpeg/lib:/usr/local/lib \
+    VS_PLUGIN_PATH=/opt/blur/vapoursynth-plugins \
     PYTHONPATH=/usr/local/lib/python3/dist-packages:/usr/local/lib/python3.12/dist-packages:/usr/local/lib/python3.12/site-packages
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-pip libpython3.12t64 \
-        ffmpeg libvulkan1 libzimg2 ca-certificates \
+        libvulkan1 libzimg2 libfftw3-single3 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local /usr/local
 COPY --from=build /opt/blur /opt/blur
+COPY --from=ffmpeg /opt/ffmpeg /opt/ffmpeg
 RUN echo /usr/local/lib > /etc/ld.so.conf.d/vapoursynth.conf \
+    && echo /opt/ffmpeg/lib > /etc/ld.so.conf.d/ffmpeg.conf \
     && ldconfig \
-    && python3 -c "import vapoursynth" \
+    && python3 -c "import vapoursynth as vs; c=vs.core; assert hasattr(c,'bs'), [p.namespace for p in c.plugins()]" \
     && vspipe --version \
+    && ffmpeg -version \
     && test -x /opt/blur/blur-cli
 
 WORKDIR /app
