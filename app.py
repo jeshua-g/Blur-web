@@ -302,6 +302,21 @@ async def create_job(
     return {"id": job_id}
 
 
+@app.get("/api/jobs")
+def list_jobs(_: None = Depends(require_auth)):
+    if not DATA.is_dir():
+        return []
+    rows = []
+    dirs = sorted((p for p in DATA.iterdir() if p.is_dir()), key=lambda p: p.stat().st_mtime, reverse=True)
+    for d in dirs[:20]:
+        try:
+            s = read_status(d.name)
+        except FileNotFoundError:
+            continue
+        rows.append({"id": s.get("id") or d.name, "status": s.get("status"), "filename": s.get("filename")})
+    return rows
+
+
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str, _: None = Depends(require_auth)):
     try:

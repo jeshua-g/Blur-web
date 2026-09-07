@@ -407,6 +407,7 @@
 
   <script>
     const KEY = "blur-web-config";
+    const JOB_KEY = "blur-web-job";
     const EXTS = [".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"];
     const fileInput = document.getElementById("file");
     const form = document.getElementById("form");
@@ -612,7 +613,17 @@
       send(f);
     });
 
+    function track(id) {
+      localStorage.setItem(JOB_KEY, id);
+      const u = new URL(location.href);
+      u.searchParams.set("j", id);
+      history.replaceState(null, "", u);
+    }
+
     function poll(id) {
+      track(id);
+      busy = true;
+      bar.style.display = "none";
       const tick = async () => {
         let r;
         try {
@@ -623,11 +634,13 @@
           return;
         }
         if (r.status === 404) {
+          localStorage.removeItem(JOB_KEY);
           toast("that job disappeared on the server");
           busy = false;
           return;
         }
         const j = await r.json();
+        if (j.filename) picked.textContent = j.filename;
         if (j.status === "queued") status.textContent = "waiting";
         if (j.status === "running") status.textContent = "rendering";
         if (j.status === "done") {
@@ -646,6 +659,20 @@
         setTimeout(tick, 2000);
       };
       tick();
+    }
+
+    async function resume() {
+      const id = new URLSearchParams(location.search).get("j") || localStorage.getItem(JOB_KEY);
+      if (id) {
+        poll(id);
+        return;
+      }
+      try {
+        const r = await fetch("/api/jobs");
+        const jobs = r.ok ? await r.json() : [];
+        const j = jobs.find((x) => x.status === "running" || x.status === "queued") || jobs.find((x) => x.status === "done");
+        if (j?.id) poll(j.id);
+      } catch {}
     }
 
     function send(file) {
@@ -699,6 +726,7 @@
           busy = false;
           return;
         }
+        bar.style.display = "none";
         status.textContent = "queued";
         poll(JSON.parse(xhr.responseText).id);
       };
@@ -717,6 +745,7 @@
 
     enhanceSelects();
     load();
+    resume();
   </script>
 </body>
 </html>
